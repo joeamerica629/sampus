@@ -51,7 +51,8 @@ export default{async fetch(request,env){
     const target=new URL(request.url);if(path==='/sprava/')target.pathname='/sprava';
     const asset=await env.ASSETS.fetch(new Request(target,request));const r=new Response(asset.body,asset);for(const [k,v]of Object.entries(security))r.headers.set(k,v);return r;
   }
-  if(!admin&&!await basic(request,env)){
+  const publicHost=['biketech.cz','www.biketech.cz'].includes(url.hostname);
+  if(!publicHost&&!admin&&!await basic(request,env)){
     if(!env.PREVIEW_PASSWORD)return response('Preview is not configured. Přihlaste se na /sprava.',503);
     return response('Authentication required.',401,{'WWW-Authenticate':'Basic realm="BikeTech preview", charset="UTF-8"'});
   }
