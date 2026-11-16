@@ -11,6 +11,11 @@ function validDate(s){return typeof s==='string'&&/^20\d{2}-\d{2}-\d{2}$/.test(s
 async function init(db){await db.prepare('CREATE TABLE IF NOT EXISTS notices (id TEXT PRIMARY KEY,start_date TEXT NOT NULL,end_date TEXT NOT NULL,message TEXT NOT NULL,closed INTEGER NOT NULL,created_at TEXT NOT NULL,cancelled INTEGER NOT NULL DEFAULT 0)').run();await db.prepare('CREATE TABLE IF NOT EXISTS login_attempts (key TEXT PRIMARY KEY,attempts INTEGER NOT NULL,expires INTEGER NOT NULL)').run();}
 async function basic(request,env){if(!env.PREVIEW_PASSWORD)return false;const header=request.headers.get('Authorization')||'';let user='',password='',format=false;if(/^Basic /i.test(header)){try{const raw=Uint8Array.from(atob(header.slice(6)),c=>c.charCodeAt(0)),decoded=new TextDecoder('utf-8',{fatal:true}).decode(raw),at=decoded.indexOf(':');if(at>=0){user=decoded.slice(0,at);password=decoded.slice(at+1);format=true;}}catch{}}const [u,p]=await Promise.all([equals(user,env.PREVIEW_USER||'klient'),equals(password,env.PREVIEW_PASSWORD)]);return format&&u&&p;}
 export default{async fetch(request,env){
+  const res=await handle(request,env);
+  if(['biketech.cz','www.biketech.cz'].includes(new URL(request.url).hostname)&&res.headers.has('X-Robots-Tag')){const r=new Response(res.body,res);r.headers.delete('X-Robots-Tag');return r;}
+  return res;
+}};
+async function handle(request,env){
   const url=new URL(request.url),path=url.pathname;
   if(url.protocol!=='https:')return response('HTTPS required',403);
   if(!env.ASSETS)return response('Preview is not configured.',503);
@@ -61,4 +66,4 @@ export default{async fetch(request,env){
     try{await init(env.DB);const r=await env.DB.prepare('SELECT start_date,end_date,message,closed FROM notices WHERE cancelled=0 AND end_date>=? ORDER BY start_date,created_at DESC').bind(today()).all();return json({notices:r.results});}catch{return json({error:'Oznámení se nepodařilo načíst.'},503);}
   }
   const asset=await env.ASSETS.fetch(request),r=new Response(asset.body,asset);for(const [k,v]of Object.entries(security))r.headers.set(k,v);return r;
-}};
+}
